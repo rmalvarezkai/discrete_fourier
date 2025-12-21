@@ -204,9 +204,10 @@ def main(argv): # pylint: disable=unused-argument
     __data_in = __data['X__estimated_price_b'].dropna().tolist()
     __period_init = 1024
     __period_end = len(__data_in) - __windows_size
-    __correlation_limit = 0.89
+    __correlation_limit = 0.85
+    __confidence_limit = 0.85
 
-    print('Top Periods Validation:')
+    print('Find cycles:')
     for p in range(__period_init, __period_end + 1):
         if len(__data_in) >= (__windows_size + p):
             val = DiscreteFourier.validate_period(
@@ -220,10 +221,15 @@ def main(argv): # pylint: disable=unused-argument
                     and val['correlation'] is not None\
                     and isinstance(val['correlation'], (float, int))\
                     and val['correlation'] >= __correlation_limit:
-                    print(f"Period {p:.1f}: "
-                        f"valid={val['valid']}, "
-                        f"confidence={val['confidence']:.2f}, "
-                        f"correlation={val['correlation']:.2f}")
+                    if 'confidence' in val\
+                        and val['confidence'] is not None\
+                        and isinstance(val['confidence'], (float, int))\
+                        and val['confidence'] >= __confidence_limit:
+
+                        print(f"Period {p}: "
+                              f"valid={val['valid']}, "
+                              f"confidence={val['confidence']}, "
+                              f"correlation={val['correlation']}")
     print('=' * 80)
 
     return result

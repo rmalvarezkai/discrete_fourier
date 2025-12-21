@@ -572,11 +572,11 @@ class DiscreteFourier():
 
         result = {
             'valid': bool(valid),
-            'confidence': float(confidence),
-            'correlation': float(correlation),
-            'rmse': float(normalized_rmse),
-            'cosine_similarity': float(cosine_similarity),
-            'period': float(period),
+            'confidence': round(float(confidence), 8),
+            'correlation': round(float(correlation), 8),
+            'rmse': round(float(normalized_rmse), 8),
+            'cosine_similarity': round(float(cosine_similarity), 8),
+            'period': round(float(period), 8),
             'window_size': int(window_size)
         }
 
