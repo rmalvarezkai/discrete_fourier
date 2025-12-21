@@ -356,9 +356,9 @@ class DiscreteFourier():
         dominant_magnitude = magnitudes[dominant_idx]
 
         return {
-            'period': dominant_period,
-            'k': dominant_k,
-            'magnitude': dominant_magnitude,
+            'period': round(float(dominant_period), 4),
+            'k': round(float(dominant_k), 4),
+            'magnitude': round(float(dominant_magnitude), 8),
             'data_length': n_len
         }
 
@@ -437,10 +437,10 @@ class DiscreteFourier():
             percent = 100 * magnitude / total_magnitude if total_magnitude > 0 else 0
 
             results.append({
-                'k': int(k),
-                'period': float(period),
-                'magnitude': float(magnitude),
-                'percent': float(percent)
+                'k': round(float(k), 4),
+                'period': round(float(period), 4),
+                'magnitude': round(float(magnitude), 8),
+                'percent': round(float(percent), 4)
             })
 
         return results

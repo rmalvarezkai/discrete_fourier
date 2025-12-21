@@ -178,7 +178,7 @@ def main(argv): # pylint: disable=unused-argument
         fourier_coefs=__fourier_coefs
     )
     print('Dominant Period:')
-    pprint.pprint(dominant_period)
+    pprint.pprint(dominant_period, sort_dicts=False)
     print('=' * 80)
 
     # Validar el período dominante
@@ -187,7 +187,7 @@ def main(argv): # pylint: disable=unused-argument
         period=dominant_period['period']
     )
     print('Period Validation:')
-    pprint.pprint(validation)
+    pprint.pprint(validation, sort_dicts=False)
     print('=' * 80)
 
     top_periods = DiscreteFourier.find_top_periods(
@@ -195,20 +195,30 @@ def main(argv): # pylint: disable=unused-argument
         n_periods=5
     )
     print('Top Periods:')
-    pprint.pprint(top_periods)
+    pprint.pprint(top_periods, sort_dicts=False)
     print('=' * 80)
 
+    return result
     # Validar los top períodos
+    __windows_size = 256
+    __data_in = __data['X__estimated_price_b'].dropna().tolist()
+    __period_init = 1024
+    __period_end = len(__data_in) - __windows_size
+
     print('Top Periods Validation:')
-    for i, p in enumerate(top_periods, 1):
-        val = DiscreteFourier.validate_period(
-            data_in=__data['X__estimated_price_b'].dropna().tolist(),
-            period=p['period']
-        )
-        print(f"{i}. Period {p['period']:.1f}: "
-              f"valid={val['valid']}, "
-              f"confidence={val['confidence']:.2f}, "
-              f"correlation={val['correlation']:.2f}")
+    for p in range(__period_init, __period_end + 1):
+        if len(__data_in) >= (__windows_size + p):
+            val = DiscreteFourier.validate_period(
+                data_in=__data_in,
+                period=p,
+                window_size=__windows_size
+            )
+
+            if val is not None and isinstance(val, dict) and 'valid' in val and val['valid']:
+                print(f"Period {p:.1f}: "
+                    f"valid={val['valid']}, "
+                    f"confidence={val['confidence']:.2f}, "
+                    f"correlation={val['correlation']:.2f}")
     print('=' * 80)
 
     return result
