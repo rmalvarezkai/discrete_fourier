@@ -6,6 +6,7 @@ Author: Ricardo Marcelo Alvarez
 Date: 2025-12-19
 """
 
+from typing import Union
 import numpy
 
 class DiscreteFourier():
@@ -285,3 +286,161 @@ class DiscreteFourier():
         result = numpy.sum(numpy_result)
 
         return result
+
+    @classmethod
+    def find_dominant_period(cls,
+                             data_in: Union[list, numpy.ndarray] = None,
+                             fourier_coefs: tuple = None):
+        """
+        Find the dominant period in the data using Fourier coefficient magnitudes.
+        
+        Identifies the frequency component with the largest magnitude, which
+        represents the most prominent cyclical pattern in the data.
+        
+        Parameters
+        ----------
+        data_in : list or array-like, optional
+            Input data sequence. Either data_in or fourier_coefs must be provided.
+        fourier_coefs : tuple of (numpy.ndarray, numpy.ndarray), optional
+            Pre-calculated (a_k, b_k) coefficients. Either data_in or fourier_coefs
+            must be provided.
+        
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - 'period' (float): Dominant period in data points (N/k)
+            - 'k' (int): Frequency index with highest magnitude
+            - 'magnitude' (float): Magnitude of the dominant component
+            - 'data_length' (int): Original data length N
+        
+        Notes
+        -----
+        - The magnitude of component k is: sqrt(a_k² + b_k²)
+        - Period = N/k, where N is the data length
+        - Maximum detectable period is N (k=1, the fundamental frequency)
+        - Minimum detectable period is 2 (k=N/2, the Nyquist frequency)
+        - To detect periods longer than N, you need more data
+        
+        The DC component (k=0, representing the mean) is excluded from analysis.
+        
+        Examples
+        --------
+        >>> data = [1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 3, 2]
+        >>> result = DiscreteFourier.find_dominant_period(data)
+        >>> print(f"Dominant period: {result['period']:.2f} points")
+        >>> print(f"This pattern repeats every {result['period']:.1f} data points")
+        """
+        if fourier_coefs is None:
+            if data_in is None:
+                raise ValueError("Either data_in or fourier_coefs must be provided")
+            fourier_coefs = cls.calculate_fourier_coefs(data_in)
+            n_len = len(data_in) if len(data_in) % 2 == 0 else len(data_in) - 1
+        else:
+            a_k = fourier_coefs[0]
+            k_len = len(a_k) - 1
+            n_len = k_len * 2
+
+        a_k = fourier_coefs[0]
+        b_k = fourier_coefs[1]
+
+        # Calculate magnitudes (skip a_0, the DC component)
+        magnitudes = numpy.sqrt(a_k[1:]**2 + b_k[1:]**2)
+
+        # Find the k with maximum magnitude
+        dominant_idx = numpy.argmax(magnitudes)
+        dominant_k = dominant_idx + 1  # +1 because we skipped k=0
+
+        # Calculate period: N/k
+        dominant_period = n_len / dominant_k
+        dominant_magnitude = magnitudes[dominant_idx]
+
+        return {
+            'period': dominant_period,
+            'k': dominant_k,
+            'magnitude': dominant_magnitude,
+            'data_length': n_len
+        }
+
+    @classmethod
+    def find_top_periods(cls,
+                         data_in: Union[list, numpy.ndarray] = None,
+                         fourier_coefs: tuple = None,
+                         n_periods: int = 3):
+        """
+        Find the top N dominant periods in the data.
+        
+        Identifies multiple frequency components ranked by magnitude, revealing
+        the most significant cyclical patterns in the data.
+        
+        Parameters
+        ----------
+        data_in : Union[list, numpy.ndarray], optional
+            Input data sequence. Either data_in or fourier_coefs must be provided.
+        fourier_coefs : tuple of (numpy.ndarray, numpy.ndarray), optional
+            Pre-calculated (a_k, b_k) coefficients. Either data_in or fourier_coefs
+            must be provided.
+        n_periods : int, default=3
+            Number of top periods to return
+        
+        Returns
+        -------
+        list of dict
+            List of dictionaries, sorted by magnitude (highest first), each containing:
+            - 'period' (float): Period in data points (N/k)
+            - 'k' (int): Frequency index
+            - 'magnitude' (float): Magnitude of this component
+            - 'percent' (float): Percentage of total magnitude
+        
+        Notes
+        -----
+        The percentage shows the relative importance of each frequency component.
+        A high percentage (>50%) indicates a very dominant periodic pattern.
+        Multiple similar percentages suggest the signal has multiple important cycles.
+        
+        Examples
+        --------
+        >>> data = numpy.sin(numpy.linspace(0, 4*numpy.pi, 100))
+        >>> top_periods = DiscreteFourier.find_top_periods(data, n_periods=5)
+        >>> for i, p in enumerate(top_periods, 1):
+        ...     print(f"{i}. Period: {p['period']:.1f}, "
+        ...           f"k={p['k']}, {p['percent']:.1f}% of signal")
+        """
+        if fourier_coefs is None:
+            if data_in is None:
+                raise ValueError("Either data_in or fourier_coefs must be provided")
+            fourier_coefs = cls.calculate_fourier_coefs(data_in)
+            n_len = len(data_in) if len(data_in) % 2 == 0 else len(data_in) - 1
+        else:
+            a_k = fourier_coefs[0]
+            k_len = len(a_k) - 1
+            n_len = k_len * 2
+
+        a_k = fourier_coefs[0]
+        b_k = fourier_coefs[1]
+
+        # Calculate magnitudes (skip a_0, the DC component)
+        magnitudes = numpy.sqrt(a_k[1:]**2 + b_k[1:]**2)
+
+        # Get indices of top N magnitudes
+        n_periods = min(n_periods, len(magnitudes))
+        top_indices = numpy.argsort(magnitudes)[::-1][:n_periods]
+
+        # Calculate total magnitude for percentages
+        total_magnitude = magnitudes.sum()
+
+        results = []
+        for idx in top_indices:
+            k = idx + 1  # +1 because we skipped k=0
+            period = n_len / k
+            magnitude = magnitudes[idx]
+            percent = 100 * magnitude / total_magnitude if total_magnitude > 0 else 0
+
+            results.append({
+                'k': int(k),
+                'period': float(period),
+                'magnitude': float(magnitude),
+                'percent': float(percent)
+            })
+
+        return results

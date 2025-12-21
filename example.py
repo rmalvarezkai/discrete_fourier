@@ -174,6 +174,21 @@ def main(argv): # pylint: disable=unused-argument
     print(f'DATA MAX VAR VALUE: {__data_max_var_value}')
     print('=' * 80)
 
+    dominant_period = DiscreteFourier.find_dominant_period(
+        fourier_coefs=__fourier_coefs
+    )
+    print('Dominant Period:')
+    pprint.pprint(dominant_period)
+    print('=' * 80)
+
+    top_periods = DiscreteFourier.find_top_periods(
+        fourier_coefs=__fourier_coefs,
+        n_periods=5
+    )
+    print('Top Periods:')
+    pprint.pprint(top_periods)
+    print('=' * 80)
+
     return result
 
 if __name__ == "__main__":

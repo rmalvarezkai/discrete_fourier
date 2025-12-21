@@ -8,6 +8,7 @@ A Python library for computing Discrete Fourier Series coefficients and reconstr
 - **Signal Reconstruction**: Evaluate the Fourier series at any position (interpolation and extrapolation)
 - **First Derivative**: Calculate the rate of change of the reconstructed signal
 - **Second Derivative**: Compute the curvature/acceleration of the signal
+- **Period Detection**: Find dominant periods and cyclical patterns in data
 - **NumPy-based**: Efficient vectorized computations for fast performance
 
 ## Why Not Just Use NumPy FFT?
@@ -131,6 +132,15 @@ print(f"Next value: {future_value:.2f}")
 derivative = DiscreteFourier.calculate_fourier_derivative_value(coefs, 3)
 second_deriv = DiscreteFourier.calculate_fourier_double_derivative_value(coefs, 3)
 print(f"At position 3: f'={derivative:.2f}, f''={second_deriv:.2f}")
+
+# Find dominant period
+dominant = DiscreteFourier.find_dominant_period(data)
+print(f"Dominant period: {dominant['period']:.2f} points")
+
+# Find top 3 periods
+top_periods = DiscreteFourier.find_top_periods(data, n_periods=3)
+for i, p in enumerate(top_periods, 1):
+    print(f"{i}. Period: {p['period']:.1f}, k={p['k']}, {p['percent']:.1f}% of signal")
 ```
 
 ## API Reference
@@ -197,6 +207,74 @@ Calculate the second derivative (curvature) at position t.
 - Concavity detection (positive = concave up, negative = concave down)
 - Finding inflection points (where f''(t) = 0)
 - Acceleration calculation from position data
+
+### `DiscreteFourier.find_dominant_period(data_in=None, fourier_coefs=None)`
+
+Find the dominant (most prominent) period in the data.
+
+**Parameters:**
+- `data_in` (list or array-like, optional): Input data sequence
+- `fourier_coefs` (tuple, optional): Pre-calculated (a_k, b_k) coefficients
+  - Either `data_in` or `fourier_coefs` must be provided
+
+**Returns:**
+- `dict`: Dictionary containing:
+  - `'period'` (float): Dominant period in data points
+  - `'k'` (int): Frequency index with highest magnitude
+  - `'magnitude'` (float): Magnitude of the dominant component
+  - `'data_length'` (int): Original data length N
+
+**Use cases:**
+- Detecting the main cyclical pattern in time series
+- Identifying the most important frequency component
+- Understanding periodicity in seasonal data
+
+**Important notes:**
+- Maximum detectable period is N (the data length)
+- To detect periods longer than N, you need more data
+- The DC component (mean) is excluded from analysis
+
+**Example:**
+```python
+data = [1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 3, 2]  # Period of 6
+result = DiscreteFourier.find_dominant_period(data)
+print(f"Period: {result['period']:.1f} points")  # Should be close to 6
+```
+
+### `DiscreteFourier.find_top_periods(data_in=None, fourier_coefs=None, n_periods=3)`
+
+Find the top N dominant periods ranked by magnitude.
+
+**Parameters:**
+- `data_in` (list or array-like, optional): Input data sequence
+- `fourier_coefs` (tuple, optional): Pre-calculated (a_k, b_k) coefficients
+  - Either `data_in` or `fourier_coefs` must be provided
+- `n_periods` (int, default=3): Number of top periods to return
+
+**Returns:**
+- `list of dict`: List sorted by magnitude (highest first), each containing:
+  - `'period'` (float): Period in data points (N/k)
+  - `'k'` (int): Frequency index
+  - `'magnitude'` (float): Magnitude of this component
+  - `'percent'` (float): Percentage of total magnitude
+
+**Use cases:**
+- Identifying multiple cyclical patterns
+- Understanding complex periodic behavior
+- Comparing relative importance of different periods
+
+**Example:**
+```python
+import numpy as np
+
+# Signal with multiple periods
+t = np.linspace(0, 100, 200)
+signal = np.sin(2*np.pi*t/20) + 0.5*np.sin(2*np.pi*t/10)
+
+top = DiscreteFourier.find_top_periods(signal.tolist(), n_periods=5)
+for i, p in enumerate(top, 1):
+    print(f"{i}. Period: {p['period']:.1f}, {p['percent']:.1f}%")
+```
 
 ## Mathematical Background
 

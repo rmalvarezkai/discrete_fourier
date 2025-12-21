@@ -1,7 +1,7 @@
 [project]
 name = "discrete-fourier"
-version = "0.1.0"
-description = "Tool to calculate discrete Fourier coefs"
+version = "0.2.0"
+description = "Tool to calculate discrete Fourier coefs and analyze periodic patterns"
 authors = [
     {name = "Ricardo Marcelo Alvarez",email = "rmalvarezkai@gmail.com"}
 ]
