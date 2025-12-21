@@ -444,3 +444,147 @@ class DiscreteFourier():
             })
 
         return results
+
+    @classmethod
+    def validate_period(cls,
+                        data_in: Union[list, numpy.ndarray],
+                        period: float,
+                        window_size: int = None,
+                        method: str = 'all'):
+        """
+        Validate if a detected period actually repeats in the data.
+        
+        Compares the last window of data with an earlier window separated by one period
+        to verify if the pattern truly repeats. This helps distinguish real periodicity
+        from mathematical artifacts.
+        
+        Parameters
+        ----------
+        data_in : list or array-like
+            Input data sequence to validate
+        period : float
+            Period to validate (in data points). Can be fractional.
+        window_size : int, optional
+            Size of the comparison window. If None, uses min(period/2, 50)
+        method : str, default='all'
+            Validation method to use:
+            - 'correlation': Pearson correlation coefficient
+            - 'rmse': Root Mean Square Error (normalized)
+            - 'cosine': Cosine similarity
+            - 'all': Returns all metrics (recommended)
+        
+        Returns
+        -------
+        dict
+            Dictionary containing validation metrics:
+            - 'valid' (bool): True if period appears valid (correlation > 0.5)
+            - 'confidence' (float): Overall confidence score (0-1)
+            - 'correlation' (float): Pearson correlation (-1 to 1)
+            - 'rmse' (float): Normalized RMSE (0 to 1, lower is better)
+            - 'cosine_similarity' (float): Cosine similarity (0 to 1)
+            - 'period' (float): The period being validated
+            - 'window_size' (int): Size of comparison window used
+            
+        Notes
+        -----
+        The validation compares:
+            - Recent window: data[-window_size:]
+            - Previous cycle: data[-(period+window_size):-period]
+        
+        For reliable validation:
+            - Need at least 2 complete periods in data
+            - Larger window_size gives more robust results
+            - Correlation > 0.7 indicates strong periodicity
+            - Correlation < 0.3 suggests period is not real
+        
+        Examples
+        --------
+        >>> # Validate dominant period
+        >>> data = numpy.sin(numpy.linspace(0, 4*numpy.pi, 100))
+        >>> dominant = DiscreteFourier.find_dominant_period(data)
+        >>> validation = DiscreteFourier.validate_period(data, dominant['period'])
+        >>> print(f"Confidence: {validation['confidence']:.2f}")
+        >>> print(f"Correlation: {validation['correlation']:.2f}")
+        """
+        data = numpy.array(data_in)
+        period_int = int(round(period))
+
+        # Default window size: use half the period or 50, whichever is smaller
+        if window_size is None:
+            window_size = min(max(period_int // 2, 10), 50)
+
+        # Ensure we have enough data
+        required_len = period_int + window_size
+        if len(data) < required_len:
+            return {
+                'valid': False,
+                'confidence': 0.0,
+                'correlation': 0.0,
+                'rmse': 1.0,
+                'cosine_similarity': 0.0,
+                'period': period,
+                'window_size': window_size,
+                'error': f'Insufficient data: need {required_len}, have {len(data)}'
+            }
+
+        # Extract windows for comparison
+        recent_window = data[-window_size:]
+        previous_cycle = data[-(period_int + window_size):-period_int]
+
+        # Ensure both windows have the same size
+        min_len = min(len(recent_window), len(previous_cycle))
+        recent_window = recent_window[:min_len]
+        previous_cycle = previous_cycle[:min_len]
+
+        # Calculate correlation
+        if numpy.std(recent_window) == 0 or numpy.std(previous_cycle) == 0:
+            correlation = 0.0
+        else:
+            correlation = numpy.corrcoef(recent_window, previous_cycle)[0, 1]
+
+        # Calculate normalized RMSE
+        rmse = numpy.sqrt(numpy.mean((recent_window - previous_cycle)**2))
+        data_range = numpy.std(data)
+        normalized_rmse = rmse / data_range if data_range > 0 else 1.0
+        normalized_rmse = min(normalized_rmse, 1.0)  # Cap at 1.0
+
+        # Calculate cosine similarity
+        dot_product = numpy.dot(recent_window, previous_cycle)
+        norm_recent = numpy.linalg.norm(recent_window)
+        norm_previous = numpy.linalg.norm(previous_cycle)
+
+        if norm_recent == 0 or norm_previous == 0:
+            cosine_similarity = 0.0
+        else:
+            cosine_similarity = dot_product / (norm_recent * norm_previous)
+
+        # Calculate overall confidence score
+        # Weight: correlation 50%, cosine 30%, (1-rmse) 20%
+        confidence = (
+            0.5 * max(correlation, 0) +
+            0.3 * max(cosine_similarity, 0) +
+            0.2 * (1 - normalized_rmse)
+        )
+        confidence = max(0.0, min(1.0, confidence))
+
+        # Determine if valid (correlation > 0.5 or confidence > 0.6)
+        valid = correlation > 0.5 or confidence > 0.6
+
+        result = {
+            'valid': bool(valid),
+            'confidence': float(confidence),
+            'correlation': float(correlation),
+            'rmse': float(normalized_rmse),
+            'cosine_similarity': float(cosine_similarity),
+            'period': float(period),
+            'window_size': int(window_size)
+        }
+
+        if method == 'correlation':
+            return correlation
+        elif method == 'rmse':
+            return normalized_rmse
+        elif method == 'cosine':
+            return cosine_similarity
+        else:  # method == 'all'
+            return result

@@ -9,6 +9,7 @@ A Python library for computing Discrete Fourier Series coefficients and reconstr
 - **First Derivative**: Calculate the rate of change of the reconstructed signal
 - **Second Derivative**: Compute the curvature/acceleration of the signal
 - **Period Detection**: Find dominant periods and cyclical patterns in data
+- **Period Validation**: Verify if detected periods are real patterns with confidence scores
 - **NumPy-based**: Efficient vectorized computations for fast performance
 
 ## Why Not Just Use NumPy FFT?
@@ -136,6 +137,11 @@ print(f"At position 3: f'={derivative:.2f}, f''={second_deriv:.2f}")
 # Find dominant period
 dominant = DiscreteFourier.find_dominant_period(data)
 print(f"Dominant period: {dominant['period']:.2f} points")
+
+# Validate the period
+validation = DiscreteFourier.validate_period(data, dominant['period'])
+print(f"Period is valid: {validation['valid']}")
+print(f"Confidence: {validation['confidence']:.2f}")
 
 # Find top 3 periods
 top_periods = DiscreteFourier.find_top_periods(data, n_periods=3)
@@ -274,6 +280,64 @@ signal = np.sin(2*np.pi*t/20) + 0.5*np.sin(2*np.pi*t/10)
 top = DiscreteFourier.find_top_periods(signal.tolist(), n_periods=5)
 for i, p in enumerate(top, 1):
     print(f"{i}. Period: {p['period']:.1f}, {p['percent']:.1f}%")
+```
+
+### `DiscreteFourier.validate_period(data_in, period, window_size=None, method='all')`
+
+Validate if a detected period actually repeats in the data.
+
+**Parameters:**
+- `data_in` (list or array-like): Input data sequence
+- `period` (float): Period to validate (in data points)
+- `window_size` (int, optional): Size of comparison window. If None, uses min(period/2, 50)
+- `method` (str, default='all'): Validation method
+  - `'correlation'`: Returns only correlation coefficient
+  - `'rmse'`: Returns only normalized RMSE
+  - `'cosine'`: Returns only cosine similarity
+  - `'all'`: Returns full validation metrics (recommended)
+
+**Returns:**
+- `dict` (when method='all'): Dictionary containing:
+  - `'valid'` (bool): True if period appears valid
+  - `'confidence'` (float): Overall confidence score (0-1)
+  - `'correlation'` (float): Pearson correlation (-1 to 1)
+  - `'rmse'` (float): Normalized RMSE (0-1, lower is better)
+  - `'cosine_similarity'` (float): Cosine similarity (0-1)
+  - `'period'` (float): The period being validated
+  - `'window_size'` (int): Size of comparison window used
+- `float` (when method is specific metric): The requested metric value
+
+**Use cases:**
+- Verifying that detected periods are real patterns, not artifacts
+- Filtering false positives in noisy data
+- Assessing confidence before using period for predictions
+
+**Interpretation:**
+- **Correlation > 0.7**: Strong periodic pattern (high confidence)
+- **Correlation 0.5-0.7**: Moderate periodicity
+- **Correlation < 0.3**: Weak or no periodicity (likely false positive)
+- **Confidence > 0.8**: Very reliable period
+- **Confidence < 0.4**: Period questionable, use with caution
+
+**Example:**
+```python
+# Find and validate dominant period
+data = numpy.sin(numpy.linspace(0, 4*numpy.pi, 100))
+dominant = DiscreteFourier.find_dominant_period(data)
+validation = DiscreteFourier.validate_period(data, dominant['period'])
+
+if validation['valid']:
+    print(f"Period {validation['period']:.1f} is valid!")
+    print(f"Confidence: {validation['confidence']:.2f}")
+    print(f"Correlation: {validation['correlation']:.2f}")
+else:
+    print("Period may not be reliable")
+
+# Validate all top periods
+top_periods = DiscreteFourier.find_top_periods(data, n_periods=5)
+for p in top_periods:
+    val = DiscreteFourier.validate_period(data, p['period'])
+    print(f"Period {p['period']:.1f}: confidence={val['confidence']:.2f}")
 ```
 
 ## Mathematical Background
