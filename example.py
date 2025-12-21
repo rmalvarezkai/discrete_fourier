@@ -198,12 +198,13 @@ def main(argv): # pylint: disable=unused-argument
     pprint.pprint(top_periods, sort_dicts=False)
     print('=' * 80)
 
-    return result
+    # return result
     # Validar los top períodos
     __windows_size = 256
     __data_in = __data['X__estimated_price_b'].dropna().tolist()
     __period_init = 1024
     __period_end = len(__data_in) - __windows_size
+    __correlation_limit = 0.89
 
     print('Top Periods Validation:')
     for p in range(__period_init, __period_end + 1):
@@ -215,10 +216,14 @@ def main(argv): # pylint: disable=unused-argument
             )
 
             if val is not None and isinstance(val, dict) and 'valid' in val and val['valid']:
-                print(f"Period {p:.1f}: "
-                    f"valid={val['valid']}, "
-                    f"confidence={val['confidence']:.2f}, "
-                    f"correlation={val['correlation']:.2f}")
+                if 'correlation' in val\
+                    and val['correlation'] is not None\
+                    and isinstance(val['correlation'], (float, int))\
+                    and val['correlation'] >= __correlation_limit:
+                    print(f"Period {p:.1f}: "
+                        f"valid={val['valid']}, "
+                        f"confidence={val['confidence']:.2f}, "
+                        f"correlation={val['correlation']:.2f}")
     print('=' * 80)
 
     return result
