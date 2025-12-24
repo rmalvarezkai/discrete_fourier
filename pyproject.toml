@@ -1,6 +1,6 @@
 [project]
 name = "discrete-fourier"
-version = "0.3.2"
+version = "0.3.4"
 description = "Calculate discrete Fourier coefficients, detect periods, and validate periodic patterns"
 authors = [
     {name = "Ricardo Marcelo Alvarez",email = "rmalvarezkai@gmail.com"}
@@ -26,4 +26,6 @@ dev = [
     "ta-lib (>=0.6.8,<0.7.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
     "ehdtd (>=0.2.37,<0.3.0)",
+    "plotly (>=6.5.0,<7.0.0)",
+    "dotenv (>=0.9.9,<0.10.0)",
 ]

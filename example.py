@@ -7,11 +7,18 @@ Date: 2025-12-19
 """
 
 import sys
+import os
+import datetime
+import pwd
+import grp
 import time
 import pprint # pylint: disable=unused-import
 import numpy
 import pandas
 import talib
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from dotenv import load_dotenv
 from ehdtd import EhdtdRO, Ehdtd # pylint: disable=unused-import
 
 import discrete_fourier.df_common_functions as dcf # pylint: disable=unused-import
@@ -30,11 +37,14 @@ def main(argv): # pylint: disable=unused-argument
     pandas.set_option('display.min_rows', __display_rows)
     pandas.set_option('display.max_rows', __display_rows)
 
+    # Load database credentials from .database.env
+    load_dotenv('.database.env')
+
     __db_data = {
         'db_type': 'postgresql',  # postgresql, mysql
-        'db_name': 'ehdtd',
-        'db_user': 'ehdtd',
-        'db_pass': 'MPBGghtEgQJi',
+        'db_name': os.getenv('DB_NAME', ''),
+        'db_user': os.getenv('DB_USER', ''),
+        'db_pass': os.getenv('DB_PASS', ''),
         'db_host': '127.0.0.1',
         'db_port': '5432'
     }
@@ -60,6 +70,7 @@ def main(argv): # pylint: disable=unused-argument
     __high_coef = 0.15
     __ema_timeperiod_s = 5
     __ema_timeperiod_d = 3
+    __filter_top_n = 4
 
     __columns_to_del = [
         'close_time',
@@ -141,17 +152,72 @@ def main(argv): # pylint: disable=unused-argument
     )
 
     __fourier_calculated_values = [
-        DiscreteFourier.calculate_fourier_value(__fourier_coefs, n + 1)
+        DiscreteFourier.calculate_fourier_value(__fourier_coefs, n+1)
+        for n in range(len(__data))
+    ]
+
+    __fourier_calculated_filter_values = [
+        DiscreteFourier.calculate_fourier_value(__fourier_coefs, n+1, __filter_top_n)
         for n in range(len(__data))
     ]
 
     # Calcular Fourier SIN extensión (solo datos originales) en posiciones futuras
     __fourier_original_values = [
-        DiscreteFourier.calculate_fourier_value(__fourier_coefs_original, n + 1)
+        DiscreteFourier.calculate_fourier_value(__fourier_coefs_original, n+1)
         for n in range(__original_len, __original_len + __n_futures)
     ]
 
+    __fourier_derivative_values = [
+        DiscreteFourier.calculate_fourier_derivative_value(__fourier_coefs, n + 1)
+        for n in range(len(__data))
+    ]
+
+    __fourier_derivative_filter_values = [
+        DiscreteFourier.calculate_fourier_derivative_value(__fourier_coefs, n + 1, __filter_top_n)
+        for n in range(len(__data))
+    ]
+
+    __fourier_double_derivative_values = [
+        DiscreteFourier.calculate_fourier_double_derivative_value(__fourier_coefs, n + 1)
+        for n in range(len(__data))
+    ]
+
+    __fourier_double_derivative_filter_values = [
+        DiscreteFourier.calculate_fourier_double_derivative_value(__fourier_coefs,
+                                                                   n + 1,
+                                                                   __filter_top_n)
+        for n in range(len(__data))
+    ]
+
+    __n_data_d = 5  # Para eliminar valores inestables en derivadas
+
     __data['X__fourier_value'] = __fourier_calculated_values[:len(__data)]
+    __data['X__fourier_value_filtered'] = __fourier_calculated_filter_values[:len(__data)]
+
+    __data['X__fourier_derivative_value'] = __fourier_derivative_values[:len(__data)]
+    __data['X__fourier_derivative_value'] = 0
+    __data['X__fourier_derivative_value_filtered'] = (
+        __fourier_derivative_filter_values[:len(__data)]
+    )
+    __data['X__fourier_double_derivative_value'] = (
+        __fourier_double_derivative_values[:len(__data)]
+    )
+    __data['X__fourier_double_derivative_value'] = 0
+
+    __data['X__fourier_double_derivative_value_filtered'] = (
+        __fourier_double_derivative_filter_values[:len(__data)]
+    )
+
+    __data['X__fourier_derivative_value'].iloc[-__n_data_d:] = 0
+    __data['X__fourier_derivative_value_filtered'].iloc[-__n_data_d:] = 0
+    __data['X__fourier_double_derivative_value'].iloc[-__n_data_d:] = 0
+    __data['X__fourier_double_derivative_value_filtered'].iloc[-__n_data_d:] = 0
+
+    __data['X__fourier_derivative_value'].iloc[0:__n_data_d] = 0
+    __data['X__fourier_derivative_value_filtered'].iloc[0:__n_data_d] = 0
+    __data['X__fourier_double_derivative_value'].iloc[0:__n_data_d] = 0
+    __data['X__fourier_double_derivative_value_filtered'].iloc[0:__n_data_d] = 0
+
     __data['X__fourier_no_extension'] = numpy.nan
     __data.loc[__data.index[-__n_futures:], 'X__fourier_no_extension'] = __fourier_original_values
     __data['X__fourier_value'] = __data['X__fourier_value'].round(8)
@@ -163,8 +229,8 @@ def main(argv): # pylint: disable=unused-argument
 
     # Mostrar las últimas 20 filas con columnas clave
     print(__data[['X__estimated_price_b', 'X__polyfit_extension',
-                   'X__fourier_value', 'X__fourier_no_extension', 
-                   'X__fourier_value_abs']].tail(20))
+                  'X__fourier_value', 'X__fourier_value_filtered',
+                  'X__fourier_no_extension', 'X__fourier_value_abs']].tail(20))
 
     print('=' * 80)
     print(f'LEN: {len(__data)}')
@@ -192,7 +258,7 @@ def main(argv): # pylint: disable=unused-argument
 
     top_periods = DiscreteFourier.find_top_periods(
         fourier_coefs=__fourier_coefs,
-        n_periods=5
+        n_periods=__filter_top_n
     )
     print('Top Periods:')
     pprint.pprint(top_periods, sort_dicts=False)
@@ -232,6 +298,259 @@ def main(argv): # pylint: disable=unused-argument
                               f"correlation={val['correlation']}")
     print('=' * 80)
 
+    # Create plotly visualization
+
+    # Create .html directory if it doesn't exist
+    os.makedirs('.html', exist_ok=True)
+
+    # Import subplots for creating multiple charts
+
+    # Create figure with 3 subplots
+    fig = make_subplots(
+        rows=3, cols=1,
+        subplot_titles=(
+            'Fourier Analysis - Value',
+            'Fourier Analysis - First Derivative (Slope)',
+            'Fourier Analysis - Second Derivative (Curvature)'
+        ),
+        vertical_spacing=0.08,
+        row_heights=[0.34, 0.33, 0.33],
+        shared_yaxes=False
+    )
+
+    # First subplot: Fourier values
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__estimated_price_b'],
+        mode='lines',
+        name='Estimated Price (Normalized)',
+        line=dict(color='blue', width=2),
+        legendgroup='group1',
+        showlegend=True
+    ), row=1, col=1)
+
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_value'],
+        mode='lines',
+        name='Fourier Value',
+        line=dict(color='red', width=2, dash='dash'),
+        legendgroup='group1',
+        showlegend=True
+    ), row=1, col=1)
+
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_value_filtered'],
+        mode='lines',
+        name=f'Fourier Value Filtered (top {__filter_top_n})',
+        line=dict(color='green', width=2, dash='dot'),
+        legendgroup='group1',
+        showlegend=True
+    ), row=1, col=1)
+
+    # Second subplot: First derivative
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_derivative_value'],
+        mode='lines',
+        name='First Derivative',
+        line=dict(color='orange', width=2),
+        legendgroup='group2',
+        showlegend=True
+    ), row=2, col=1)
+
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_derivative_value_filtered'],
+        mode='lines',
+        name=f'First Derivative Filtered (top {__filter_top_n})',
+        line=dict(color='cyan', width=2, dash='dash'),
+        legendgroup='group2',
+        showlegend=True
+    ), row=2, col=1)
+
+    # Third subplot: Second derivative
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_double_derivative_value'],
+        mode='lines',
+        name='Second Derivative',
+        line=dict(color='purple', width=2),
+        legendgroup='group3',
+        showlegend=True
+    ), row=3, col=1)
+
+    fig.add_trace(go.Scatter(
+        x=__data.index,
+        y=__data['X__fourier_double_derivative_value_filtered'],
+        mode='lines',
+        name=f'Second Derivative Filtered (top {__filter_top_n})',
+        line=dict(color='yellow', width=2, dash='dash'),
+        legendgroup='group3',
+        showlegend=True
+    ), row=3, col=1)
+
+    # Update layout
+    fig.update_layout(
+        title_text=f'Fourier Analysis - {__symbol} ({__interval})',
+        hovermode='x unified',
+        template='plotly_dark',
+        height=1400,
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        )
+    )
+
+    # Update x-axes
+    fig.update_xaxes(title_text="Index", row=1, col=1)
+    fig.update_xaxes(title_text="Index", row=2, col=1)
+    fig.update_xaxes(title_text="Index", row=3, col=1)
+
+    # Update y-axes with independent scales (matches=None ensures independence)
+    fig.update_yaxes(title_text="Value", row=1, col=1, matches=None)
+    fig.update_yaxes(title_text="Derivative", row=2, col=1, matches=None)
+    fig.update_yaxes(title_text="2nd Derivative", row=3, col=1, matches=None)
+
+    # Save to HTML file with dark theme
+    html_filename = f'.html/fourier_analysis_{__symbol.replace("/", "_")}_{__interval}.html'
+
+    fig.write_html(
+        html_filename,
+        config={'displayModeBar': True, 'displaylogo': False},
+        include_plotlyjs='cdn',
+        full_html=True,
+        default_width='100%',
+        default_height='100%'
+    )
+
+    # Read the generated HTML and wrap it with dark theme
+    with open(html_filename, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    # Insert dark background style into the HTML
+    html_content = html_content.replace(
+        '<head>',
+        '<head><style>body { background-color: #1e1e1e; margin: 0; padding: 20px; }</style>'
+    )
+
+    with open(html_filename, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    # Set file permissions
+    os.chown(html_filename, -1, os.getgid())  # Keep user, set group
+    os.chmod(html_filename, 0o664)
+
+    # Try to set www-data as owner and repository as group
+    try:
+        www_data_uid = pwd.getpwnam('www-data').pw_uid
+        repository_gid = grp.getgrnam('repository').gr_gid
+        os.chown(html_filename, www_data_uid, repository_gid)
+    except (KeyError, PermissionError) as e:
+        print(f'Warning: Could not set user/group ownership: {e}')
+
+    print(f'Plot saved to: {html_filename}')
+
+    # Create or update index.html
+    index_filename = '.html/index.html'
+
+    # Get all HTML files in the directory (excluding index.html)
+    html_files = [f for f in os.listdir('.html') if f.endswith('.html') and f != 'index.html']
+    html_files.sort()
+
+    # Generate index.html content
+    index_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fourier Analysis - Index</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .file-list {
+            background-color: #2d2d2d;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        .file-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #4CAF50;
+            background-color: #3a3a3a;
+        }
+        .file-item a {
+            color: #64B5F6;
+            text-decoration: none;
+            font-size: 16px;
+        }
+        .file-item a:hover {
+            text-decoration: underline;
+            color: #90CAF9;
+        }
+        .timestamp {
+            color: #999;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fourier Analysis Reports</h1>
+    <div class="file-list">
+"""
+
+    if html_files:
+        for html_file in html_files:
+            file_path = os.path.join('.html', html_file)
+            file_time = os.path.getmtime(file_path)
+            timestamp = datetime.datetime.fromtimestamp(file_time).strftime('%Y-%m-%d %H:%M:%S')
+            index_content += f"""        <div class="file-item">
+            <a href="{html_file}">{html_file}</a>
+            <span class="timestamp">Last modified: {timestamp}</span>
+        </div>
+"""
+    else:
+        index_content += """        <p>No analysis reports available yet.</p>
+"""
+
+    index_content += """    </div>
+</body>
+</html>
+"""
+
+    # Write index.html
+    with open(index_filename, 'w', encoding='utf-8') as f:
+        f.write(index_content)
+
+    # Set permissions for index.html
+    try:
+        os.chmod(index_filename, 0o664)
+        www_data_uid = pwd.getpwnam('www-data').pw_uid
+        repository_gid = grp.getgrnam('repository').gr_gid
+        os.chown(index_filename, www_data_uid, repository_gid)
+    except (KeyError, PermissionError) as e:
+        print(f'Warning: Could not set user/group ownership for index.html: {e}')
+
+    print(f'Index updated: {index_filename}')
+    print('=' * 80)
+    print('http://192.168.252.23/discrete_fourier')
+    print('=' * 80)
     return result
 
 if __name__ == "__main__":

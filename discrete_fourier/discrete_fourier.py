@@ -110,7 +110,7 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_value(cls, fourier_coefs, t):
+    def calculate_fourier_value(cls, fourier_coefs, t, filter_top_n=None):
         """
         calculate_fourier_value
         =======================
@@ -128,6 +128,11 @@ class DiscreteFourier():
         t : int or float
             Position at which to evaluate the Fourier series. Can be any real number,
             but the series is periodic with period N (the original data length).
+        filter_top_n : int, optional
+            If provided, filters the coefficients to keep only those with the highest
+            magnitudes. Finds the top N dominant periods and determines the minimum
+            magnitude among them. All coefficients with magnitude smaller than this
+            threshold are set to zero, effectively filtering out weak frequency components.
         
         Returns
         -------
@@ -140,6 +145,16 @@ class DiscreteFourier():
             f(t) = a_0 + Σ[a_k * cos(2πkt/N) + b_k * sin(2πkt/N)]
         
         Due to the periodic nature of Fourier series, f(t) = f(t + N) = f(t + 2N) = ...
+        
+        When filter_top_n is used, the function:
+        1. Finds the top N periods using find_top_periods()
+        2. Determines the minimum magnitude among those top N periods
+        3. Calculates magnitude for each coefficient: sqrt(a_k² + b_k²)
+        4. Sets to zero all coefficients where magnitude < minimum magnitude
+        5. Computes the series with the filtered coefficients
+        
+        This filtering effectively removes noise and weak frequency components,
+        keeping only the most significant periodic patterns in the reconstruction.
         
         Examples
         --------
@@ -210,11 +225,14 @@ class DiscreteFourier():
         >>> # Positive value indicates increasing trendate_fourier_coefs(data)
         >>> value_at_1 = DiscreteFourier.calculate_fourier_value(coefs, 1)
         >>> # value_at_1 should be close to data[0] = 1.0
+        >>> # With filtering:
+        >>> value_filtered = DiscreteFourier.calculate_fourier_value(coefs, 1, filter_top_n=5)
+        >>> # Only uses top 5 dominant frequencies
         """
         result = 0
 
-        a_k = fourier_coefs[0]
-        b_k = fourier_coefs[1]
+        a_k = fourier_coefs[0].copy()
+        b_k = fourier_coefs[1].copy()
 
         result = a_k[0]
 
@@ -223,6 +241,22 @@ class DiscreteFourier():
 
         k_len = len(a_k)
         n_len = k_len * 2
+
+        # Apply filter if requested
+        if filter_top_n is not None and filter_top_n > 0:
+            top_periods = cls.find_top_periods(fourier_coefs=fourier_coefs, n_periods=filter_top_n)
+            # Find the minimum magnitude among top N periods
+            min_magnitude = min(top_periods, key=lambda x: x['magnitude'])['magnitude']
+
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
 
         k = numpy.arange(1, k_len + 1)
         rad_const = (2 * numpy.pi) / n_len
@@ -234,21 +268,71 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_derivative_value(cls, fourier_coefs, t):
+    def calculate_fourier_derivative_value(cls, fourier_coefs, t, filter_top_n=None):
         """
         calculate_fourier_derivative_value
         ==================================
+        
+        Calculate the first derivative (slope) of the Fourier series at a specific position.
+        
+        Computes the rate of change of the reconstructed signal at position t by
+        differentiating the Fourier series term by term.
+        
+        Parameters
+        ----------
+        fourier_coefs : tuple of (numpy.ndarray, numpy.ndarray)
+            Tuple of (a_k, b_k) coefficients from calculate_fourier_coefs()
+        t : int or float
+            Position at which to evaluate the derivative
+        filter_top_n : int, optional
+            If provided, filters the coefficients to keep only those with the highest
+            magnitudes before computing the derivative. Uses the same filtering logic
+            as calculate_fourier_value().
+        
+        Returns
+        -------
+        float
+            The first derivative value at position t (df/dt)
+        
+        Notes
+        -----
+        The derivative is computed using:
+            f'(t) = Σ[k * (2π/N) * (-a_k * sin(2πkt/N) + b_k * cos(2πkt/N))]
+        
+        The derivative is useful for:
+        - Detecting local maxima/minima (where f'(t) = 0)
+        - Identifying trend direction (positive = increasing, negative = decreasing)
+        - Calculating velocity from position data
+        
+        When filter_top_n is used, weak frequency components are filtered out before
+        computing the derivative, providing a smoother trend indication.
         """
         result = 0
 
-        a_k = fourier_coefs[0]
-        b_k = fourier_coefs[1]
+        a_k = fourier_coefs[0].copy()
+        b_k = fourier_coefs[1].copy()
 
         a_k = a_k[1:]
         b_k = b_k[1:]
 
         k_len = len(a_k)
         n_len = k_len * 2
+
+        # Apply filter if requested
+        if filter_top_n is not None and filter_top_n > 0:
+            top_periods = cls.find_top_periods(fourier_coefs=fourier_coefs, n_periods=filter_top_n)
+            # Find the minimum magnitude among top N periods
+            min_magnitude = min(top_periods, key=lambda x: x['magnitude'])['magnitude']
+
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
 
         k = numpy.arange(1, k_len + 1)
         rad_const = (2 * numpy.pi) / n_len
@@ -261,21 +345,72 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_double_derivative_value(cls, fourier_coefs, t):
+    def calculate_fourier_double_derivative_value(cls, fourier_coefs, t, filter_top_n=None):
         """
         calculate_fourier_double_derivative_value
         =========================================
+        
+        Calculate the second derivative (curvature) of the Fourier series at a specific position.
+        
+        Computes the rate of change of the slope (acceleration) of the reconstructed signal
+        at position t by differentiating the Fourier series twice.
+        
+        Parameters
+        ----------
+        fourier_coefs : tuple of (numpy.ndarray, numpy.ndarray)
+            Tuple of (a_k, b_k) coefficients from calculate_fourier_coefs()
+        t : int or float
+            Position at which to evaluate the second derivative
+        filter_top_n : int, optional
+            If provided, filters the coefficients to keep only those with the highest
+            magnitudes before computing the second derivative. Uses the same filtering
+            logic as calculate_fourier_value().
+        
+        Returns
+        -------
+        float
+            The second derivative value at position t (d²f/dt²)
+        
+        Notes
+        -----
+        The second derivative is computed using:
+            f''(t) = Σ[-k² * (2π/N)² * (a_k * cos(2πkt/N) + b_k * sin(2πkt/N))]
+        
+        The second derivative is useful for:
+        - Identifying inflection points (where f''(t) = 0)
+        - Detecting concavity (positive = concave up, negative = concave down)
+        - Calculating acceleration from position data
+        - Finding local extrema (combined with first derivative)
+        
+        When filter_top_n is used, weak frequency components are filtered out before
+        computing the second derivative, providing smoother curvature analysis.
         """
         result = 0
 
-        a_k = fourier_coefs[0]
-        b_k = fourier_coefs[1]
+        a_k = fourier_coefs[0].copy()
+        b_k = fourier_coefs[1].copy()
 
         a_k = a_k[1:]
         b_k = b_k[1:]
 
         k_len = len(a_k)
         n_len = k_len * 2
+
+        # Apply filter if requested
+        if filter_top_n is not None and filter_top_n > 0:
+            top_periods = cls.find_top_periods(fourier_coefs=fourier_coefs, n_periods=filter_top_n)
+            # Find the minimum magnitude among top N periods
+            min_magnitude = min(top_periods, key=lambda x: x['magnitude'])['magnitude']
+
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
 
         k = numpy.arange(1, k_len + 1)
         rad_const = (2 * numpy.pi) / n_len
@@ -406,6 +541,7 @@ class DiscreteFourier():
         ...     print(f"{i}. Period: {p['period']:.1f}, "
         ...           f"k={p['k']}, {p['percent']:.1f}% of signal")
         """
+        n_len = 0
         if fourier_coefs is None:
             if data_in is None:
                 raise ValueError("Either data_in or fourier_coefs must be provided")
