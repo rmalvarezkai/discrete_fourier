@@ -189,7 +189,7 @@ def main(argv): # pylint: disable=unused-argument
         for n in range(len(__data))
     ]
 
-    __n_data_d = 5  # Para eliminar valores inestables en derivadas
+    __n_data_d = 2  # Para eliminar valores inestables en derivadas
 
     __data['X__fourier_value'] = __fourier_calculated_values[:len(__data)]
     __data['X__fourier_value_filtered'] = __fourier_calculated_filter_values[:len(__data)]
@@ -208,15 +208,19 @@ def main(argv): # pylint: disable=unused-argument
         __fourier_double_derivative_filter_values[:len(__data)]
     )
 
-    __data['X__fourier_derivative_value'].iloc[-__n_data_d:] = 0
-    __data['X__fourier_derivative_value_filtered'].iloc[-__n_data_d:] = 0
-    __data['X__fourier_double_derivative_value'].iloc[-__n_data_d:] = 0
-    __data['X__fourier_double_derivative_value_filtered'].iloc[-__n_data_d:] = 0
+    __data.loc[__data.index[-__n_data_d:], 'X__fourier_derivative_value'] = numpy.nan
+    __data.loc[__data.index[-__n_data_d:], 'X__fourier_derivative_value_filtered'] = numpy.nan
+    __data.loc[__data.index[-__n_data_d:], 'X__fourier_double_derivative_value'] = numpy.nan
+    __data.loc[__data.index[-__n_data_d:], 'X__fourier_double_derivative_value_filtered'] = (
+        numpy.nan
+    )
 
-    __data['X__fourier_derivative_value'].iloc[0:__n_data_d] = 0
-    __data['X__fourier_derivative_value_filtered'].iloc[0:__n_data_d] = 0
-    __data['X__fourier_double_derivative_value'].iloc[0:__n_data_d] = 0
-    __data['X__fourier_double_derivative_value_filtered'].iloc[0:__n_data_d] = 0
+    __data.loc[__data.index[0:__n_data_d], 'X__fourier_derivative_value'] = numpy.nan
+    __data.loc[__data.index[0:__n_data_d], 'X__fourier_derivative_value_filtered'] = numpy.nan
+    __data.loc[__data.index[0:__n_data_d], 'X__fourier_double_derivative_value'] = numpy.nan
+    __data.loc[__data.index[0:__n_data_d], 'X__fourier_double_derivative_value_filtered'] = (
+        numpy.nan
+    )
 
     __data['X__fourier_no_extension'] = numpy.nan
     __data.loc[__data.index[-__n_futures:], 'X__fourier_no_extension'] = __fourier_original_values
