@@ -189,7 +189,7 @@ def main(argv): # pylint: disable=unused-argument
         for n in range(len(__data))
     ]
 
-    __n_data_d = 2  # Para eliminar valores inestables en derivadas
+    __n_data_d = 1  # Para eliminar valores inestables en derivadas
 
     __data['X__fourier_value'] = __fourier_calculated_values[:len(__data)]
     __data['X__fourier_value_filtered'] = __fourier_calculated_filter_values[:len(__data)]
@@ -396,8 +396,9 @@ def main(argv): # pylint: disable=unused-argument
     ), row=3, col=1)
 
     # Update layout
+    current_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     fig.update_layout(
-        title_text=f'Fourier Analysis - {__symbol} ({__interval})',
+        title_text=f'Fourier Analysis - {__symbol} ({__interval}) - {current_datetime}',
         hovermode='x unified',
         template='plotly_dark',
         height=1400,
