@@ -6,7 +6,7 @@ A Python library for computing Discrete Fourier Series coefficients and reconstr
 
 - **Fourier Coefficient Calculation**: Compute real Fourier series coefficients (a_k, b_k) from discrete data
 - **Signal Reconstruction**: Evaluate the Fourier series at any position (interpolation and extrapolation)
-- **Magnitude Filtering**: Filter reconstruction to keep only the most significant frequency components
+- **Magnitude Filtering**: Filter reconstruction by top N components or by percentage of maximum magnitude
 - **First Derivative**: Calculate the rate of change of the reconstructed signal
 - **Second Derivative**: Compute the curvature/acceleration of the signal
 - **Period Detection**: Find dominant periods and cyclical patterns in data
@@ -131,6 +131,11 @@ for i in range(len(data)):
     filtered = DiscreteFourier.calculate_fourier_value(coefs, i + 1, filter_top_n=3)
     print(f"Position {i+1}: Filtered={filtered:.2f}")
 
+# Reconstruct with percentage filtering (keeps coefficients >= 5% of max magnitude)
+for i in range(len(data)):
+    filtered_porc = DiscreteFourier.calculate_fourier_value(coefs, i + 1, filter_porc=5.0)
+    print(f"Position {i+1}: Filtered (5%)={filtered_porc:.2f}")
+
 # Predict future values (extrapolation)
 future_value = DiscreteFourier.calculate_fourier_value(coefs, len(data) + 1)
 print(f"Next value: {future_value:.2f}")
@@ -173,7 +178,7 @@ Calculate Fourier series coefficients from discrete data.
 - If input has odd length, the first element is removed to ensure even length
 - Uses real Fourier series representation: `f(t) = a_0 + Σ[a_k*cos(2πkt/N) + b_k*sin(2πkt/N)]`
 
-### `DiscreteFourier.calculate_fourier_value(fourier_coefs, t, filter_top_n=None)`
+### `DiscreteFourier.calculate_fourier_value(fourier_coefs, t, filter_top_n=None, filter_porc=None)`
 
 Reconstruct the signal value at position t, optionally with magnitude filtering.
 
@@ -181,6 +186,7 @@ Reconstruct the signal value at position t, optionally with magnitude filtering.
 - `fourier_coefs` (tuple): (a_k, b_k) from `calculate_fourier_coefs()`
 - `t` (int or float): Position to evaluate (can be beyond original data range)
 - `filter_top_n` (int, optional): If provided, filters coefficients to keep only those with the highest magnitudes. Finds the top N dominant periods and sets all coefficients with magnitude smaller than the minimum magnitude among the top N to zero.
+- `filter_porc` (float, optional): If provided, filters coefficients by percentage of maximum magnitude. Calculates the maximum magnitude and sets a threshold at filter_porc percent of that maximum. All coefficients with magnitude below this threshold are set to zero. For example, filter_porc=2.5 keeps only coefficients with magnitude >= 2.5% of the maximum magnitude.
 
 **Returns:**
 - `float`: Reconstructed value at position t
@@ -188,13 +194,21 @@ Reconstruct the signal value at position t, optionally with magnitude filtering.
 **Notes:**
 - Due to periodicity: f(t) = f(t + N) where N is the original data length
 - Can be used for interpolation (within data range) or extrapolation (beyond data range)
-- When `filter_top_n` is used, weak frequency components are eliminated, reducing noise while preserving the most significant periodic patterns
+- When `filter_top_n` or `filter_porc` is used, weak frequency components are eliminated, reducing noise while preserving the most significant periodic patterns
+- Only one filter should be used at a time (filter_top_n or filter_porc)
 
 **Filtering process (when filter_top_n is provided):**
 1. Finds the top N periods using `find_top_periods()`
 2. Determines the minimum magnitude among those top N periods
 3. Calculates magnitude for each coefficient: sqrt(a_k² + b_k²)
 4. Sets to zero all coefficients where magnitude < minimum magnitude
+5. Computes the series with the filtered coefficients
+
+**Filtering process (when filter_porc is provided):**
+1. Calculates magnitude for each coefficient: sqrt(a_k² + b_k²)
+2. Finds the maximum magnitude across all coefficients
+3. Sets minimum threshold: min_magnitude = (max_magnitude * filter_porc) / 100
+4. Sets to zero all coefficients where magnitude < min_magnitude
 5. Computes the series with the filtered coefficients
 
 **Example:**
@@ -205,6 +219,9 @@ value = DiscreteFourier.calculate_fourier_value(coefs, 10)
 # Filtered reconstruction (keeps only top 5 frequency components)
 filtered_value = DiscreteFourier.calculate_fourier_value(coefs, 10, filter_top_n=5)
 
+# Percentage-based filtering (keeps coefficients >= 10% of max magnitude)
+filtered_by_percent = DiscreteFourier.calculate_fourier_value(coefs, 10, filter_porc=10.0)
+
 # Compare original vs filtered reconstruction
 import matplotlib.pyplot as plt
 data = [1.0, 2.5, 4.0, 3.5, 2.0, 1.5, 2.0, 3.0, 4.0, 3.0, 2.0, 1.5]
@@ -213,15 +230,17 @@ coefs = DiscreteFourier.calculate_fourier_coefs(data)
 t_vals = numpy.linspace(1, len(data), 100)
 original_curve = [DiscreteFourier.calculate_fourier_value(coefs, t) for t in t_vals]
 filtered_curve = [DiscreteFourier.calculate_fourier_value(coefs, t, filter_top_n=3) for t in t_vals]
+filtered_by_pct = [DiscreteFourier.calculate_fourier_value(coefs, t, filter_porc=5.0) for t in t_vals]
 
 plt.plot(t_vals, original_curve, label='Original')
 plt.plot(t_vals, filtered_curve, label='Filtered (top 3)', linestyle='--')
+plt.plot(t_vals, filtered_by_pct, label='Filtered (5%)', linestyle=':')
 plt.scatter(range(1, len(data)+1), data, color='red', label='Data points')
 plt.legend()
 plt.show()
 ```
 
-### `DiscreteFourier.calculate_fourier_derivative_value(fourier_coefs, t, filter_top_n=None)`
+### `DiscreteFourier.calculate_fourier_derivative_value(fourier_coefs, t, filter_top_n=None, filter_porc=None)`
 
 Calculate the first derivative (slope) at position t, optionally with magnitude filtering.
 
@@ -229,6 +248,7 @@ Calculate the first derivative (slope) at position t, optionally with magnitude 
 - `fourier_coefs` (tuple): (a_k, b_k) from `calculate_fourier_coefs()`
 - `t` (int or float): Position to evaluate
 - `filter_top_n` (int, optional): If provided, filters coefficients to keep only those with the highest magnitudes before computing the derivative. Uses the same filtering logic as `calculate_fourier_value()`.
+- `filter_porc` (float, optional): If provided, filters coefficients by percentage of maximum magnitude before computing the derivative. Uses the same filtering logic as `calculate_fourier_value()`.
 
 **Returns:**
 - `float`: First derivative df/dt at position t
@@ -239,7 +259,8 @@ Calculate the first derivative (slope) at position t, optionally with magnitude 
 - Velocity calculation from position data
 
 **Notes:**
-- When `filter_top_n` is used, weak frequency components are filtered out before computing the derivative, providing a smoother trend indication
+- When `filter_top_n` or `filter_porc` is used, weak frequency components are filtered out before computing the derivative, providing a smoother trend indication
+- Only one filter should be used at a time (filter_top_n or filter_porc)
 
 **Example:**
 ```python
@@ -248,9 +269,12 @@ deriv = DiscreteFourier.calculate_fourier_derivative_value(coefs, 10)
 
 # Filtered derivative (smoother, using only top 3 frequencies)
 deriv_filtered = DiscreteFourier.calculate_fourier_derivative_value(coefs, 10, filter_top_n=3)
+
+# Filtered derivative by percentage (keeps components >= 5% of max magnitude)
+deriv_by_pct = DiscreteFourier.calculate_fourier_derivative_value(coefs, 10, filter_porc=5.0)
 ```
 
-### `DiscreteFourier.calculate_fourier_double_derivative_value(fourier_coefs, t, filter_top_n=None)`
+### `DiscreteFourier.calculate_fourier_double_derivative_value(fourier_coefs, t, filter_top_n=None, filter_porc=None)`
 
 Calculate the second derivative (curvature) at position t, optionally with magnitude filtering.
 
@@ -258,6 +282,7 @@ Calculate the second derivative (curvature) at position t, optionally with magni
 - `fourier_coefs` (tuple): (a_k, b_k) from `calculate_fourier_coefs()`
 - `t` (int or float): Position to evaluate
 - `filter_top_n` (int, optional): If provided, filters coefficients to keep only those with the highest magnitudes before computing the second derivative. Uses the same filtering logic as `calculate_fourier_value()`.
+- `filter_porc` (float, optional): If provided, filters coefficients by percentage of maximum magnitude before computing the second derivative. Uses the same filtering logic as `calculate_fourier_value()`.
 
 **Returns:**
 - `float`: Second derivative d²f/dt² at position t
@@ -268,7 +293,8 @@ Calculate the second derivative (curvature) at position t, optionally with magni
 - Acceleration calculation from position data
 
 **Notes:**
-- When `filter_top_n` is used, weak frequency components are filtered out before computing the second derivative, providing smoother curvature analysis
+- When `filter_top_n` or `filter_porc` is used, weak frequency components are filtered out before computing the second derivative, providing smoother curvature analysis
+- Only one filter should be used at a time (filter_top_n or filter_porc)
 
 **Example:**
 ```python
@@ -277,6 +303,9 @@ second_deriv = DiscreteFourier.calculate_fourier_double_derivative_value(coefs, 
 
 # Filtered second derivative (smoother, using only top 3 frequencies)
 second_deriv_filtered = DiscreteFourier.calculate_fourier_double_derivative_value(coefs, 10, filter_top_n=3)
+
+# Filtered second derivative by percentage (keeps components >= 5% of max magnitude)
+second_deriv_by_pct = DiscreteFourier.calculate_fourier_double_derivative_value(coefs, 10, filter_porc=5.0)
 ```
 
 ### `DiscreteFourier.find_dominant_period(data_in=None, fourier_coefs=None)`

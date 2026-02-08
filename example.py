@@ -70,7 +70,8 @@ def main(argv): # pylint: disable=unused-argument
     __high_coef = 0.15
     __ema_timeperiod_s = 5
     __ema_timeperiod_d = 3
-    __filter_top_n = 4
+    __filter_top_n = None
+    __filter_porc = 5.0
 
     __columns_to_del = [
         'close_time',
@@ -157,7 +158,10 @@ def main(argv): # pylint: disable=unused-argument
     ]
 
     __fourier_calculated_filter_values = [
-        DiscreteFourier.calculate_fourier_value(__fourier_coefs, n+1, __filter_top_n)
+        DiscreteFourier.calculate_fourier_value(__fourier_coefs,
+                                                n+1,
+                                                filter_top_n=__filter_top_n,
+                                                filter_porc=__filter_porc)
         for n in range(len(__data))
     ]
 
@@ -173,7 +177,10 @@ def main(argv): # pylint: disable=unused-argument
     ]
 
     __fourier_derivative_filter_values = [
-        DiscreteFourier.calculate_fourier_derivative_value(__fourier_coefs, n + 1, __filter_top_n)
+        DiscreteFourier.calculate_fourier_derivative_value(__fourier_coefs,
+                                                           n + 1,
+                                                           filter_top_n=__filter_top_n,
+                                                           filter_porc=__filter_porc)
         for n in range(len(__data))
     ]
 
@@ -185,7 +192,8 @@ def main(argv): # pylint: disable=unused-argument
     __fourier_double_derivative_filter_values = [
         DiscreteFourier.calculate_fourier_double_derivative_value(__fourier_coefs,
                                                                    n + 1,
-                                                                   __filter_top_n)
+                                                                   filter_top_n=__filter_top_n,
+                                                                   filter_porc=__filter_porc)
         for n in range(len(__data))
     ]
 
@@ -347,7 +355,7 @@ def main(argv): # pylint: disable=unused-argument
         x=__data.index,
         y=__data['X__fourier_value_filtered'],
         mode='lines',
-        name=f'Fourier Value Filtered (top {__filter_top_n})',
+        name=f'Fourier Value Filtered (top {__filter_top_n}), {__filter_porc}%',
         line=dict(color='green', width=2, dash='dot'),
         legendgroup='group1',
         showlegend=True
@@ -368,7 +376,7 @@ def main(argv): # pylint: disable=unused-argument
         x=__data.index,
         y=__data['X__fourier_derivative_value_filtered'],
         mode='lines',
-        name=f'First Derivative Filtered (top {__filter_top_n})',
+        name=f'First Derivative Filtered (top {__filter_top_n}), {__filter_porc}%',
         line=dict(color='cyan', width=2, dash='dash'),
         legendgroup='group2',
         showlegend=True
@@ -389,7 +397,7 @@ def main(argv): # pylint: disable=unused-argument
         x=__data.index,
         y=__data['X__fourier_double_derivative_value_filtered'],
         mode='lines',
-        name=f'Second Derivative Filtered (top {__filter_top_n})',
+        name=f'Second Derivative Filtered (top {__filter_top_n}), {__filter_porc}%',
         line=dict(color='yellow', width=2, dash='dash'),
         legendgroup='group3',
         showlegend=True

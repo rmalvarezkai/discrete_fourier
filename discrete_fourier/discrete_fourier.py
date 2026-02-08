@@ -110,7 +110,11 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_value(cls, fourier_coefs, t, filter_top_n=None):
+    def calculate_fourier_value(cls,
+                                fourier_coefs,
+                                t,
+                                filter_top_n: int=None,
+                                filter_porc: float=None):
         """
         calculate_fourier_value
         =======================
@@ -133,6 +137,12 @@ class DiscreteFourier():
             magnitudes. Finds the top N dominant periods and determines the minimum
             magnitude among them. All coefficients with magnitude smaller than this
             threshold are set to zero, effectively filtering out weak frequency components.
+        filter_porc : float, optional
+            If provided, filters coefficients by percentage of maximum magnitude.
+            Calculates the maximum magnitude and sets a threshold at filter_porc percent
+            of that maximum. All coefficients with magnitude below this threshold are
+            set to zero. For example, filter_porc=2.5 keeps only coefficients with
+            magnitude >= 2.5% of the maximum magnitude.
         
         Returns
         -------
@@ -257,6 +267,20 @@ class DiscreteFourier():
             b_k = b_k.copy()
             a_k[mask] = 0
             b_k[mask] = 0
+        elif filter_porc is not None and filter_porc > 0:
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Calculate minimum magnitude as percentage of maximum
+            max_magnitude = numpy.max(magnitudes)
+            min_magnitude = (max_magnitude * filter_porc) / 100
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
 
         k = numpy.arange(1, k_len + 1)
         rad_const = (2 * numpy.pi) / n_len
@@ -268,7 +292,11 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_derivative_value(cls, fourier_coefs, t, filter_top_n=None):
+    def calculate_fourier_derivative_value(cls,
+                                           fourier_coefs,
+                                           t,
+                                           filter_top_n: int=None,
+                                           filter_porc: float=None):
         """
         calculate_fourier_derivative_value
         ==================================
@@ -288,6 +316,10 @@ class DiscreteFourier():
             If provided, filters the coefficients to keep only those with the highest
             magnitudes before computing the derivative. Uses the same filtering logic
             as calculate_fourier_value().
+        filter_porc : float, optional
+            If provided, filters coefficients by percentage of maximum magnitude
+            before computing the derivative. Uses the same filtering logic as
+            calculate_fourier_value().
         
         Returns
         -------
@@ -333,6 +365,20 @@ class DiscreteFourier():
             b_k = b_k.copy()
             a_k[mask] = 0
             b_k[mask] = 0
+        elif filter_porc is not None and filter_porc > 0:
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Calculate minimum magnitude as percentage of maximum
+            max_magnitude = numpy.max(magnitudes)
+            min_magnitude = (max_magnitude * filter_porc) / 100
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
 
         k = numpy.arange(1, k_len + 1)
         rad_const = (2 * numpy.pi) / n_len
@@ -345,7 +391,11 @@ class DiscreteFourier():
         return result
 
     @classmethod
-    def calculate_fourier_double_derivative_value(cls, fourier_coefs, t, filter_top_n=None):
+    def calculate_fourier_double_derivative_value(cls,
+                                                  fourier_coefs,
+                                                  t,
+                                                  filter_top_n: int=None,
+                                                  filter_porc: float=None):
         """
         calculate_fourier_double_derivative_value
         =========================================
@@ -365,6 +415,10 @@ class DiscreteFourier():
             If provided, filters the coefficients to keep only those with the highest
             magnitudes before computing the second derivative. Uses the same filtering
             logic as calculate_fourier_value().
+        filter_porc : float, optional
+            If provided, filters coefficients by percentage of maximum magnitude
+            before computing the second derivative. Uses the same filtering logic as
+            calculate_fourier_value().
         
         Returns
         -------
@@ -404,6 +458,20 @@ class DiscreteFourier():
 
             # Calculate magnitudes for all coefficients
             magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Set coefficients to zero where magnitude < min_magnitude
+            mask = magnitudes < min_magnitude
+            a_k = a_k.copy()
+            b_k = b_k.copy()
+            a_k[mask] = 0
+            b_k[mask] = 0
+        elif filter_porc is not None and filter_porc > 0:
+            # Calculate magnitudes for all coefficients
+            magnitudes = numpy.sqrt(a_k**2 + b_k**2)
+
+            # Calculate minimum magnitude as percentage of maximum
+            max_magnitude = numpy.max(magnitudes)
+            min_magnitude = (max_magnitude * filter_porc) / 100
 
             # Set coefficients to zero where magnitude < min_magnitude
             mask = magnitudes < min_magnitude
@@ -557,6 +625,9 @@ class DiscreteFourier():
 
         # Calculate magnitudes (skip a_0, the DC component)
         magnitudes = numpy.sqrt(a_k[1:]**2 + b_k[1:]**2)
+
+        if n_periods is None or n_periods <= 0:
+            n_periods = len(magnitudes)
 
         # Get indices of top N magnitudes
         n_periods = min(n_periods, len(magnitudes))

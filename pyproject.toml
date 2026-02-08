@@ -1,6 +1,6 @@
 [project]
 name = "discrete-fourier"
-version = "0.3.4"
+version = "0.3.5"
 description = "Calculate discrete Fourier coefficients, detect periods, and validate periodic patterns"
 authors = [
     {name = "Ricardo Marcelo Alvarez",email = "rmalvarezkai@gmail.com"}
