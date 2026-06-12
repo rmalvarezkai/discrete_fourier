@@ -1,6 +1,6 @@
 [project]
 name = "discrete-fourier"
-version = "0.3.6"
+version = "0.3.7"
 description = "Calculate discrete Fourier coefficients, detect periods, and validate periodic patterns"
 authors = [
     {name = "Ricardo Marcelo Alvarez",email = "rmalvarezkai@gmail.com"}
@@ -9,7 +9,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.13,<=3.14"
 dependencies = [
-    "numpy>=2.4.4",
+    "numpy>=2.4.6",
 ]
 
 
@@ -20,9 +20,9 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "dotenv>=0.9.9",
-    "ehdtd>=0.2.39",
-    "ipykernel>=7.2.0",
-    "plotly>=6.7.0",
+    "ehdtd>=0.2.41",
+    "ipykernel>=7.3.0",
+    "plotly>=6.8.0",
     "pylint>=4.0.5",
     "pytest>=9.0.3",
     "pytest-xdist>=3.8.0",
